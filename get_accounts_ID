@@ -1,0 +1,65 @@
+#!/usr/bin/python3
+# this script will issue an API call to frame to get the accountIDs for the accounts that are active and where client IDs have granted access via API
+# script will require a string as input to filter from the list
+# it assume that account names will have a substring for prod or test to distinguish among production and test accounts where later we will used to receive a clone
+# of the sandbox of the production environemt to be modified
+# usage is:
+# get_accounts.py <string to look for in the active accounts list>
+# examaple
+# get_accounts.py prod
+# get_account.py test
+
+import hashlib
+import hmac
+import time
+import requests
+import base64
+import pprint
+import json
+import sys
+
+# API clientID and secret are required to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
+# https://docs.frame.nutanix.com/frame-apis/admin-api.html
+
+if len(sys.argv) == 1 :
+  sys.exit("please give me a string for the account name you are looking for otherwise I will look for nothing")
+else :
+    if len(sys.argv) > 4 :
+        sys.exit("too many arguments")
+    else :
+        client_id = str(sys.argv[1])
+        client_secret= str(sys.argv[2])
+        account_name = str(sys.argv[3])
+
+# Client credentials
+client_secret = bytes(client_secret, 'utf-8')
+# bytes is requested since it has to be binary coded making signature with hmac
+
+# Create signature
+timestamp = int(time.time())
+to_sign = "%s%s" % (timestamp, client_id)
+signature = hmac.new(client_secret, to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+
+# Prepare http request headers
+headers = { "X-Frame-ClientId": client_id, "X-Frame-Timestamp": str(timestamp), "X-Frame-Signature": signature }
+
+# Make request to understand active accounts, and filter with the input string.
+# below request will give in any case all the accounts it sees, active or not
+
+# Make request
+r = requests.get("https://api-gateway-prod.frame.nutanix.com/v1/accounts", headers=headers)
+accounts = r.json()
+
+lenght = len(accounts)
+i = 0
+# filtering the json answer from the list of accounts received
+
+while i < lenght :
+  name = accounts[i]["name"]
+  active = str(accounts[i]["active"])
+  accountid = accounts[i]["id"]
+  if active == "True" :
+    if account_name in name :
+      # print just the accountID that is active and where name contain input parameter.
+      print(accountid)
+  i += 1

@@ -1,0 +1,49 @@
+#!/usr/bin/python3
+# this script will issue an API call to frame to create a launchpad desktop type.
+# it is required to give as input account_ID, name of the launchpad
+# usage is: create_launchpad client_id client_secret <account_ID> <launchpad_name>
+# objective is to have a launchpad to test massively a published sandbox if it is working or not
+import hashlib
+import hmac
+import time
+import requests
+import base64
+import pprint
+import json
+import sys
+
+# API clientID and secret are required to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
+# https://docs.frame.nutanix.com/frame-apis/admin-api.html
+
+if len(sys.argv) == 1 :
+  sys.exit("please give me client id, secret, account IDs, launchpad_name")
+else :
+    if len(sys.argv) > 5 :
+        sys.exit("too many arguments")
+    else :
+        client_id = str(sys.argv[1])
+        client_secret= str(sys.argv[2])
+        account_id = str(sys.argv[3])
+        launchpad_name = str(sys.argv[4])
+
+# Client credentials
+client_secret = bytes(client_secret, 'utf-8')
+# b is requested since it has to be binary coded making signature with hmac
+
+# Create signature
+timestamp = int(time.time())
+to_sign = "%s%s" % (timestamp, client_id)
+signature = hmac.new(client_secret, to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+
+# Prepare http request headers
+headers = { "X-Frame-ClientId": client_id, "X-Frame-Timestamp": str(timestamp), "X-Frame-Signature": signature }
+
+files = {
+    "name": (None, launchpad_name),
+    'url_slug': (None, launchpad_name),
+    'kind': (None, 'desktop'),
+}
+
+# Make request to create launchpad
+r = requests.post("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/launchpad" , headers=headers, files=files)
+print(r.status_code)

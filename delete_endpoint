@@ -1,0 +1,42 @@
+#!/usr/bin/python3
+# here we delete endpoints to have a clean situation on Calm
+import requests
+import json
+import pprint
+import sys
+
+# Nutanix API URL
+cluster_ip_address = '192.168.222.50'
+API_AHV = ':9440/api/nutanix/v3/'
+
+headers = {
+    'Content-Type': "application/json",
+    'Authorization': "Basic here_you_key_for_PRISMCentral",
+    }
+
+def _suppress_security():
+    # suppress the security warnings
+	requests.packages.urllib3.disable_warnings()
+
+def _request(base_url, json_data, verb):
+	_suppress_security()
+	
+	response = requests.request(verb, base_url, data=json_data, headers=headers, verify=False)
+	answer = json.loads(response.text)
+	return answer
+
+if len(sys.argv) == 1 :
+  sys.exit("please give me endpoint uuid ")
+else :
+    if len(sys.argv) > 2 :
+        sys.exit("too many arguments")
+    else :
+        endpoint_uuid = str(sys.argv[1])
+
+#composing request
+request = "endpoints/" + endpoint_uuid
+base_url = "https://" + cluster_ip_address + API_AHV + request
+endpoint_delete = _request(base_url, {} , "delete")
+
+#returnig endopoint uuid for other usage
+print(endpoint_delete)

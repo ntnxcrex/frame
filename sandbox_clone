@@ -1,0 +1,75 @@
+#!/usr/bin/python3
+# this script will issue an API call to frame to clone a sandbox from an account to the other
+# input required are:
+# account_source_id is the source account from where to take the sandbox
+# account_destination_id is the destination account where clone will land
+# it is required to find sandbox pool id to clone a sandbox
+# usage is: python3 sandbox_clone.py <source_account_id> <destination_account_id>
+
+import hashlib
+import hmac
+import time
+import requests
+import base64
+import pprint
+import json
+import sys
+
+## API clientID and secret are required to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
+# https://docs.frame.nutanix.com/frame-apis/admin-api.html
+
+if len(sys.argv) == 1 :
+  sys.exit("please give me client id and secret and source and destination account IDs")
+else :
+    if len(sys.argv) > 5 :
+        sys.exit("too many arguments")
+    else :
+        client_id = str(sys.argv[1])
+        client_secret= str(sys.argv[2])
+        account_source_id = str(sys.argv[3])
+        account_destination_id = str(sys.argv[4])
+
+
+# Client credentials
+client_secret = bytes(client_secret, 'utf-8')
+# b is requested since it has to be binary coded making signature with hmac
+
+# Create signature
+timestamp = int(time.time())
+to_sign = "%s%s" % (timestamp, client_id)
+signature = hmac.new(client_secret, to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+
+# Prepare http request headers
+headers = { "X-Frame-ClientId": client_id, "X-Frame-Timestamp": str(timestamp), "X-Frame-Signature": signature }
+
+def find_sandbox_pool_id(pools) :
+  lenght = len(pools)
+  i = 0
+  sandbox_pool_id = "none"
+  while i < lenght :
+    kind = pools[i]["kind"]
+    if kind == "sandbox" :
+      sandbox_pool_id = pools[i]["id"]
+      exit
+    i += 1
+  return sandbox_pool_id
+
+
+# Make a request to get pools from where to find sandbox pool id required for the cloning operation
+r = requests.get("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_source_id + "/pools", headers=headers)
+pools = r.json()
+#print(json.dumps(pools, indent=1))
+
+sandbox_pool_id = str(find_sandbox_pool_id(pools))
+
+# now we have all info to post a clone request, we need to create json request file where to put destination account id:
+
+files = {
+    "account_id": (None, account_destination_id),
+    "join_domain": (None, "false"),
+}
+
+#print(account_source_id, account_destination_id, sandbox_pool_id)
+response = requests.post("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_source_id + "/pools/" + sandbox_pool_id + "/clone", headers=headers, files=files)
+print(response.status_code)
+time.sleep(60)

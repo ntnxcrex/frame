@@ -1,0 +1,143 @@
+#!/usr/bin/python3
+# this script will issue an API call to frame to get list of servers registered to the account given as input
+# Servers can be among others in a pool named: sandbox, production
+# objective here is to get sandbox from list of the servers, understand its status, and in dependence of the status, can be powered on or off.
+# usage is: sandbox_actions <account_ID> <action>
+# actions can be start/stop
+# objective is to power-on a sandbox to make some changes, after changes has been implemented, sandbox can be powered off and maybe published for testing
+ 
+import hashlib
+import hmac
+import time
+import requests
+import base64
+import pprint
+import json
+import sys
+
+# API clientID and secret are required to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
+# https://docs.frame.nutanix.com/frame-apis/admin-api.html
+
+if len(sys.argv) == 1 :
+  sys.exit("please input a valid accountID and operation you want on sandbox (start/stop)")
+else :
+    if len(sys.argv) > 5 :
+        sys.exit("too many arguments")
+    else :
+        client_id = str(sys.argv[1])
+        client_secret= str(sys.argv[2])
+        account_id = str(sys.argv[3])
+        action = str(sys.argv[4])
+
+# Client credentials
+client_secret = bytes(client_secret, 'utf-8')
+# b is requested since it has to be binary coded making signature with hmac
+
+# Create signature
+timestamp = int(time.time())
+to_sign = "%s%s" % (timestamp, client_id)
+signature = hmac.new(client_secret, to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+
+# Prepare http request headers
+headers = { "X-Frame-ClientId": client_id, "X-Frame-Timestamp": str(timestamp), "X-Frame-Signature": signature }
+
+# Make request to understand active accounts, program is written to work only with the active account with given accountID
+# below request will give in any case the only active account it sees
+r = requests.get("https://api-gateway-prod.frame.nutanix.com/v1/accounts", headers=headers)
+accounts = r.json()
+
+lenght = len(accounts)
+i = 0
+found = 0
+
+# check if account id given exist
+while i < lenght :
+  active = str(accounts[i]["active"])
+  if active == "True" :
+#    print(account_id , "exists and is active")
+    found = 1
+  i += 1
+
+if found == 0 :
+  sys.exit("accountid does not exist cannot do any action")
+
+# it is important to understand sandbox status, since that VM, will not have IP address attached if not running.
+# here script will try to intercept IP address of the sandbox, attached to the VM when it is powered up
+# sandbox IP can be used as a target endpoint to modify it, e.g. install a new software, modify configuration, modify registry, run optimization...
+
+def find_sandbox_status(servers) :
+  lenght = len(servers)
+  i = 0
+  sandbox_status = "none"
+  while i < lenght :
+    name = servers[i]["pool_name"]
+    if name == "sandbox" :
+      sandbox_status = servers[i]["status"]
+      exit
+    i += 1
+  return sandbox_status
+
+def find_sandbox_ip(servers) :
+  lenght = len(servers)
+  i = 0
+#  found_index = 0
+  sandbox_ip = "none"
+
+  while i < lenght :
+    name = servers[i]["pool_name"]
+    status = servers[i]["status"]
+    if name == "sandbox" and status == "running" :
+      sandbox_ip = servers[i]["private_ip"]
+ #     found_index = i 
+      i = lenght
+    i += 1
+  return sandbox_ip
+
+# using the active accountid we can query Frame to obtain sandbox status.
+# sandbox is part of the servers listed on Frame account.
+# filtering is generalwill find servers with name sandbox.
+
+r = requests.get("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/servers", headers=headers)
+servers = r.json()
+
+sandbox_status = find_sandbox_status(servers)
+#print(sandbox_status)
+
+if sandbox_status != "running" :
+#  print("sandbox is not running")
+  if action == "start" :
+#    print("starting sandbox")
+    r = requests.post("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/sandbox/" + action , headers=headers)
+    time.sleep(30)
+    sandbox_ip = "none"
+    while sandbox_ip == "none" :
+    #querying again to understand if sandbox is coming up
+      r = requests.get("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/servers", headers=headers)
+      servers = r.json()
+      sandbox_ip = find_sandbox_ip(servers)
+#      print("waiting for sandbox to be on-line")
+      time.sleep(10)
+    print(sandbox_ip)
+  else :
+    print("sandbox already stopped, nothing to do")
+
+if sandbox_status == "running" :
+#  print("sandbox is running")
+  if action == "stop" :
+    print("stopping sandbox")
+    r = requests.post("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/sandbox/" + action , headers=headers)
+    time.sleep(30)
+    r = requests.get("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/servers", headers=headers)
+    servers = r.json()
+    sandbox_status = find_sandbox_status(servers)
+    while sandbox_status != "stopped" :
+      time.sleep(10)
+      r = requests.get("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/servers", headers=headers)
+      servers = r.json()
+      sandbox_status = find_sandbox_status(servers)
+  else :
+#    print("sandbox already running, nothing to do")
+    r = requests.get("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/servers", headers=headers)
+    servers = r.json()
+    sandbox_ip = find_sandbox_ip(servers)
+    print(sandbox_ip)

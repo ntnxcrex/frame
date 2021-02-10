@@ -1,0 +1,44 @@
+#!/usr/bin/python3
+# this script will issue an API call to frame to publish a sandbox
+# it is required to give as input client_ID, client_secret, account_ID
+# usage is: sandbox_publish <account_ID>
+# objective is to publish a sandbox to test if some changes is working and put it on production.
+
+import hashlib
+import hmac
+import time
+import requests
+import base64
+import pprint
+import json
+import sys
+
+# API clientID and secret are required to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
+# https://docs.frame.nutanix.com/frame-apis/admin-api.html
+
+if len(sys.argv) == 1 :
+  sys.exit("please give me client id and secret and source and account IDs")
+else :
+    if len(sys.argv) > 4 :
+        sys.exit("too many arguments")
+    else :
+        client_id = str(sys.argv[1])
+        client_secret= str(sys.argv[2])
+        account_id = str(sys.argv[3])
+
+
+# Client credentials
+client_secret = bytes(client_secret, 'utf-8')
+# b is requested since it has to be binary coded making signature with hmac
+
+# Create signature
+timestamp = int(time.time())
+to_sign = "%s%s" % (timestamp, client_id)
+signature = hmac.new(client_secret, to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+
+# Prepare http request headers
+headers = { "X-Frame-ClientId": client_id, "X-Frame-Timestamp": str(timestamp), "X-Frame-Signature": signature }
+
+# Make request to publish sandbox
+r = requests.post("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/publish" , headers=headers)
+print(r.status_code)

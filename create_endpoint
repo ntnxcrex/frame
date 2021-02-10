@@ -1,0 +1,149 @@
+#!/usr/bin/python3
+# here we create an endopoint (windows) with the IP adress known from a VM.
+# endpoint will be put on the same project where this script is going to be recalled.
+# so script will get project from blueprint name, then getting uuid of the project it is attached to,
+# from that info script will create the endpoint with the gathered info.
+# it is required to have as input: blueprint name, vm_ip, username to access endpoint, password for the endpoint, account where sandbox will be associated
+
+import requests
+import json
+import pprint
+import sys
+
+# Nutanix API URL
+cluster_ip_address = '192.168.222.50'
+API_AHV = ':9440/api/nutanix/v3/'
+
+headers = {
+    'Content-Type': "application/json",
+    'Authorization': "Basic here_you_key_for_PRISMCentral",
+    }
+
+def _suppress_security():
+    # suppress the security warnings
+	requests.packages.urllib3.disable_warnings()
+
+def _find_bp_UID(base_url, json_data, param):
+	_suppress_security()
+	
+	response = requests.request("POST", base_url, data=payload, headers=headers, verify=False)
+	answer = json.loads(response.text)
+	lenght = len(answer["entities"])
+
+	i = 0
+	uuid_out = []
+	while i < lenght:
+		name = answer["entities"][i]["metadata"]["name"]
+		if name == param :
+		    uuid_out = answer["entities"][i]["metadata"]["uuid"]
+		#    uuid_out.append(uuid)
+		i += 1
+	return uuid_out
+
+def _request(base_url, json_data, verb):
+	_suppress_security()
+	
+	response = requests.request(verb, base_url, data=json_data, headers=headers, verify=False)
+	answer = json.loads(response.text)
+	return answer
+
+if len(sys.argv) == 1 :
+  sys.exit("please give me blueprint name, vm_ip, cred_user, secret, account ")
+else :
+    if len(sys.argv) > 6 :
+        sys.exit("too many arguments")
+    else :
+        bp_name = str(sys.argv[1])
+        vm_ip = str(sys.argv[2])
+        cred_user = str(sys.argv[3])
+        secret = str(sys.argv[4])
+        account = str(sys.argv[5])
+
+# modify these if required
+type = "Windows"
+endpoint_name = "sandbox_" + account 
+
+# time to get blueprint ID
+request = 'blueprints/list'
+base_url = "https://" + cluster_ip_address + API_AHV + request
+payload = "{}"
+uuid_out_bp=_find_bp_UID(base_url, payload, bp_name)
+
+# time to get project ID from the blueprint name
+request = 'blueprints'
+base_url = "https://" + cluster_ip_address + API_AHV + request + "/" + uuid_out_bp
+blueprint = _request(base_url, payload, verb = "GET")
+project_id = blueprint["metadata"]["project_reference"]["uuid"]
+project_name = blueprint["metadata"]["project_reference"]["name"]
+
+#print(project_name)
+#print(project_id)
+
+request = "endpoints/import_json"
+base_url = "https://" + cluster_ip_address + API_AHV + request
+
+# creating payload for endpoint creation
+endpoint_json = {
+  "spec": {
+    "name": endpoint_name,
+    "description": "Endpoint for sandbox to modify",
+    "resources": {
+      "name": endpoint_name,
+      "type": type,
+      "attrs": {
+        "values": [ vm_ip ],
+        "value_type": "IP",
+        "port": 5985,
+	"connection_protocol": "http",
+        "credential_definition_list": [
+          {
+            "name": "endpoint_cred",
+            "description": cred_user,
+            "type": "PASSWORD",
+            "username": cred_user,
+            "secret": {
+              "attrs": {
+                "is_secret_modified": False 
+              }
+            }
+          }
+        ],
+        "login_credential_reference": {
+          "kind": "app_credential",
+          "name": "endpoint_cred"
+        }
+      }
+    }
+  },
+  "metadata": {
+    "spec_version": 1,
+    "name": endpoint_name,
+    "kind": "endpoint",
+    "project_reference": {
+      "kind": "project",
+      "uuid": project_id,
+      "name": project_name
+    }
+  },
+  "api_version": "3.0"
+}
+
+# creating endpoint with a POST
+endpoint_return = _request(base_url, json.dumps(endpoint_json), verb = "POST")
+#print(json.dumps(endpoint_return))
+
+#getting the info from the endpoint to modify username and secret for the password
+request = "endpoints/" + endpoint_return["metadata"]["uuid"]
+base_url = "https://" + cluster_ip_address + API_AHV + request
+endpoint_return = _request(base_url, {} , verb = "get")
+
+# removing status from the endpoint definition and update secret for the user
+del endpoint_return["status"]
+endpoint_return["spec"]["resources"]["attrs"]["credential_definition_list"][0]["secret"]["value"] = secret 
+endpoint_return["spec"]["resources"]["attrs"]["credential_definition_list"][0]["secret"]["attrs"]["is_secret_modified"] = "True" 
+
+# doing the update for the secret
+endpoint_update = _request(base_url, json.dumps(endpoint_return), verb = "put")
+
+#returnig endopoint uuid for other usage
+print(endpoint_return["metadata"]["uuid"])

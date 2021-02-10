@@ -1,0 +1,77 @@
+#!/usr/bin/python3
+import requests
+import json
+import pprint
+import sys
+
+headers = {
+    'Content-Type': "application/json",
+    'Authorization': "Basic here_you_key_for_PRISMCentral",
+    }
+
+if len(sys.argv) == 1 :
+  sys.exit("please give runbook name, endpoint name, endpoint uuid")
+else :
+    if len(sys.argv) > 4 :
+        sys.exit("too many arguments")
+    else :
+        runbook_name = str(sys.argv[1])
+        endpoint_name = str(sys.argv[2])
+        endpoint_uuid = str(sys.argv[3])
+
+def _suppress_security():
+    # suppress the security warnings
+	requests.packages.urllib3.disable_warnings()
+
+def _request(base_url, json_data, verb):
+	_suppress_security()
+	
+	response = requests.request(verb, base_url, data=json_data, headers=headers, verify=False)
+	answer = json.loads(response.text)
+	return answer
+
+# Nutanix API URL
+cluster_ip_address = '192.168.222.50'
+API_AHV = ':9440/api/nutanix/v3/'
+
+request = 'runbooks/list'
+base_url = "https://" + cluster_ip_address + API_AHV + request
+
+payload = "{}"
+verb = "POST"
+runbook_list=_request(base_url, payload, verb)
+
+# find runbook id to be used later to run it and modify default endpoint to run against
+lenght = len(runbook_list["entities"])
+i = 0
+while i < lenght:
+	name = runbook_list["entities"][i]["metadata"]["name"]
+	if name == runbook_name :
+          runbook_uuid = runbook_list["entities"][i]["metadata"]["uuid"]
+	i += 1
+
+print(runbook_uuid)
+# we have now runbookID, this is required to run runbook and to modify it adding an endpoint
+
+request = "runbooks/" + runbook_uuid
+base_url = "https://" + cluster_ip_address + API_AHV + request
+payload = "{}"
+verb = "GET"
+runbook_info=_request(base_url, payload, verb)
+
+#modifying runbook to put new endpoint on it, where later we will run the reconfiguration script
+del runbook_info["status"]
+
+runbook_info["spec"]["resources"]["default_target_reference"]["uuid"] = endpoint_uuid 
+runbook_info["spec"]["resources"]["default_target_reference"]["name"] = endpoint_name
+verb = "PUT"
+
+runbook_update = _request(base_url, json.dumps(runbook_info), verb)
+
+#it is now time to run runbook
+
+request = "runbooks/" + runbook_uuid + "/run"
+base_url = "https://" + cluster_ip_address + API_AHV + request
+payload = "{}"
+verb = "POST"
+runbook_run=_request(base_url, payload, verb)
