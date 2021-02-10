@@ -25,4 +25,6 @@ Overall flow is the following:
 8. create a launchpad to gain access to latest sandbox
 
 it is possible to move sandbox on various phases from prod -> dev -> test -> final user acceptance test -> production cycling the above automation.
- 
+
+All the python scripts you find here should be parked to a linux machine able to interact with Calm and send requests to Frame API via public dns name (able to connect Frame control plane)
+
