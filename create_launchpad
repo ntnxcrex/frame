@@ -12,8 +12,10 @@ import pprint
 import json
 import sys
 
-# API clientID and secret are required to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
+## this is API secret to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
 # https://docs.frame.nutanix.com/frame-apis/admin-api.html
+#Client ID: 7662f593-a29b-4e2b-a898-96be2ed4f9d0.img.frame.nutanix.com
+#Client secret: 92df052b58945de1fd8c287e5db0070f5e424c30
 
 if len(sys.argv) == 1 :
   sys.exit("please give me client id, secret, account IDs, launchpad_name")

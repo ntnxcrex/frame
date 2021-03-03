@@ -13,11 +13,11 @@ import pprint
 import json
 import sys
 
-# API clientID and secret are required to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
+## this is API secret to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
 # https://docs.frame.nutanix.com/frame-apis/admin-api.html
 
 if len(sys.argv) == 1 :
-  sys.exit("please give me client id and secret and source and account IDs")
+  sys.exit("please give me client id and secret and account IDs")
 else :
     if len(sys.argv) > 4 :
         sys.exit("too many arguments")
@@ -40,5 +40,7 @@ signature = hmac.new(client_secret, to_sign.encode('utf-8'), hashlib.sha256).hex
 headers = { "X-Frame-ClientId": client_id, "X-Frame-Timestamp": str(timestamp), "X-Frame-Signature": signature }
 
 # Make request to publish sandbox
-r = requests.post("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/publish" , headers=headers)
-print(r.status_code)
+base_url = "https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/publish"
+#print(base_url)
+r = requests.post(base_url, headers=headers)
+print(r)

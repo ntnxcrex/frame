@@ -1,0 +1,53 @@
+#!/usr/bin/python3
+import requests
+import json
+import pprint
+import sys
+import time
+
+headers = {
+    'Content-Type': "application/json",
+    'Authorization': "Basic YWRtaW46QUhWNGV2ZXIv",
+    }
+
+if len(sys.argv) == 1 :
+  sys.exit("please give runbook execution id")
+else :
+    if len(sys.argv) > 2 :
+        sys.exit("too many arguments")
+    else :
+        runbook_execution = str(sys.argv[1])
+
+def _suppress_security():
+    # suppress the security warnings
+	requests.packages.urllib3.disable_warnings()
+
+def _request(base_url, json_data, verb):
+	_suppress_security()
+	
+	response = requests.request(verb, base_url, data=json_data, headers=headers, verify=False)
+	answer = json.loads(response.text)
+	return answer
+
+# Nutanix API URL
+cluster_ip_address = '192.168.222.50'
+API_AHV = ':9440/api/nutanix/v3/'
+
+verb = "GET"
+request = "runbooks/runlogs/" + runbook_execution
+base_url = "https://" + cluster_ip_address + API_AHV + request
+status = "nin zo"
+
+'''
+while status != "RUNNING" :
+  runbook_state = _request(base_url, {}, verb)
+  status = runbook_state["status"]["action_reference"]["state"]
+  print(status)
+  time.sleep(60)
+'''
+
+runbook_state = _request(base_url, { }, verb)
+print(json.dumps(runbook_state))
+status = runbook_state["status"]["state"]
+
+print(status)

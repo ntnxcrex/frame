@@ -78,20 +78,5 @@ payload = "{}"
 verb = "POST"
 runbook_run=_request(base_url, payload, verb)
 time.sleep(60)
-print(runbook_run)
 
-runlog_uuid = runbook_run["status"]["runlog_uuid"]
-
-# it is now time to wait for runbook to finish, sometimes especially with patching, it takes a lot of time to finish
-verb = "GET"
-request = "runbooks/runlogs/" + runlog_uuid
-base_url = "https://" + cluster_ip_address + API_AHV + request
-status = "RUNNING"
-
-while status == "RUNNING" :
-  runbook_state = _request(base_url, { }, verb)
-  status = runbook_state["status"]["state"]
-  print(status,"\n")
-  time.sleep(60)
-
-print(status)
+print(runbook_run["status"]["runlog_uuid"])

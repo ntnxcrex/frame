@@ -11,7 +11,7 @@ API_AHV = ':9440/api/nutanix/v3/'
 
 headers = {
     'Content-Type': "application/json",
-    'Authorization': "Basic here_you_key_for_PRISMCentral",
+    'Authorization': "Basic YWRtaW46QUhWNGV2ZXIv",
     }
 
 def _suppress_security():
@@ -40,3 +40,4 @@ endpoint_delete = _request(base_url, {} , "delete")
 
 #returnig endopoint uuid for other usage
 print(endpoint_delete)
+

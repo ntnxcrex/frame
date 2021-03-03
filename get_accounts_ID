@@ -18,7 +18,7 @@ import pprint
 import json
 import sys
 
-# API clientID and secret are required to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
+#this is API secret to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
 # https://docs.frame.nutanix.com/frame-apis/admin-api.html
 
 if len(sys.argv) == 1 :

@@ -15,8 +15,10 @@ import pprint
 import json
 import sys
 
-# API clientID and secret are required to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
+## this is API secret to query Frame, generated on Frame UI, to connect to frame you need Client ID and client secret
 # https://docs.frame.nutanix.com/frame-apis/admin-api.html
+#Client ID: 7662f593-a29b-4e2b-a898-96be2ed4f9d0.img.frame.nutanix.com
+#Client secret: 92df052b58945de1fd8c287e5db0070f5e424c30
 
 if len(sys.argv) == 1 :
   sys.exit("please input a valid accountID and operation you want on sandbox (start/stop)")
@@ -41,8 +43,9 @@ signature = hmac.new(client_secret, to_sign.encode('utf-8'), hashlib.sha256).hex
 # Prepare http request headers
 headers = { "X-Frame-ClientId": client_id, "X-Frame-Timestamp": str(timestamp), "X-Frame-Signature": signature }
 
-# Make request to understand active accounts, program is written to work only with the active account with given accountID
-# below request will give in any case the only active account it sees
+# Make request to understand active accounts, program is written to work only with the first active account it find.
+# it is possible of course to create a variable and work on a specific active account, in other words, if API clientID generated on
+# Frame broker has just 1 active account, below request wil give in any case the only active account it sees
 r = requests.get("https://api-gateway-prod.frame.nutanix.com/v1/accounts", headers=headers)
 accounts = r.json()
 
@@ -59,9 +62,10 @@ while i < lenght :
   i += 1
 
 if found == 0 :
-  sys.exit("accountid does not exist cannot do any action")
+  sys.exit("accountid does not exist program will return an error")
 
-# it is important to understand sandbox status, since that VM, will not have IP address attached if not running.
+# it is important to understand sandbox status, since that VM, if running on Nutanix, will not have IP address attached if not running.
+# there is no knowledge, from what I saw on servers json answer, in any way to understand VM id to work with
 # here script will try to intercept IP address of the sandbox, attached to the VM when it is powered up
 # sandbox IP can be used as a target endpoint to modify it, e.g. install a new software, modify configuration, modify registry, run optimization...
 
@@ -93,9 +97,9 @@ def find_sandbox_ip(servers) :
     i += 1
   return sandbox_ip
 
-# using the active accountid we can query Frame to obtain sandbox status.
-# sandbox is part of the servers listed on Frame account.
-# filtering is generalwill find servers with name sandbox.
+# using the active accountid we can query Frame to obtain sandbox status, in case there is not an active account the other requests will fail.
+# sandbox is part of the servers listed on Frame account, from the experience gathered it looks like to be the first one listed on the servers get request
+# filtering is general, will find sandbox even if it is not the first servers listed.
 
 r = requests.get("https://api-gateway-prod.frame.nutanix.com/v1/accounts/" + account_id + "/servers", headers=headers)
 servers = r.json()
